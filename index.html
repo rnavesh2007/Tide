@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tide — Water Intake Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0B1E2D;
+    --ink-2:#122A3D;
+    --foam:#F3F7F6;
+    --tide:#2E7DA8;
+    --aqua:#7FD8C4;
+    --coral:#E8846B;
+    --slate:#8FA6B3;
+    --slate-dim:#5C7382;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:radial-gradient(120% 120% at 50% -10%, #16324A 0%, var(--ink) 55%);
+    color:var(--foam);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:32px 18px 60px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{ width:100%; max-width:420px; }
+
+  header{ margin-bottom:28px; }
+  .eyebrow{
+    font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--aqua); font-weight:600; margin-bottom:6px;
+  }
+  h1{
+    font-family:'Fraunces', serif; font-weight:500; font-size:28px;
+    letter-spacing:-.01em;
+  }
+  .date{ color:var(--slate); font-size:14px; margin-top:4px; }
+
+  /* --- API key card --- */
+  .apikey-card{
+    margin-top:18px;
+    background:var(--ink-2);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:14px;
+    padding:14px 16px;
+  }
+  .apikey-title{ font-size:13px; font-weight:700; color:var(--foam); }
+  .apikey-sub{ font-size:11.5px; color:var(--slate-dim); margin-top:2px; line-height:1.4; }
+  .apikey-row{ display:flex; gap:8px; margin-top:10px; }
+  .apikey-row input{
+    flex:1; background:var(--ink); border:1px solid rgba(255,255,255,0.08);
+    color:var(--foam); border-radius:10px; padding:9px 12px; font-size:13px;
+    font-family:'Inter'; letter-spacing:.02em;
+  }
+  .apikey-row input:focus{ outline:none; border-color:var(--tide); }
+  .apikey-row button{
+    background:var(--aqua); color:var(--ink); border:none; border-radius:10px;
+    padding:0 16px; font-weight:700; font-size:13px; cursor:pointer;
+  }
+  .apikey-row button:hover{ opacity:.9; }
+  .apikey-status{ font-size:11.5px; margin-top:8px; min-height:14px; }
+  .apikey-status.ok{ color:var(--aqua); }
+  .apikey-status.warn{ color:var(--coral); }
+
+  .glass-wrap{
+    position:relative;
+    display:flex; justify-content:center;
+    margin:8px 0 26px;
+  }
+  .glass{
+    position:relative;
+    width:210px; height:260px;
+    border-radius:14px 14px 34px 34px;
+    border:2px solid rgba(243,247,246,0.16);
+    overflow:hidden;
+    background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.25);
+  }
+  .glass::before{
+    content:"";
+    position:absolute; top:0; left:14px; width:1px; height:100%;
+    background:repeating-linear-gradient(180deg, rgba(255,255,255,0.14) 0 2px, transparent 2px 22px);
+  }
+  .water{
+    position:absolute; left:0; right:0; bottom:0;
+    height:0%;
+    background:linear-gradient(180deg, var(--aqua) 0%, var(--tide) 100%);
+    transition:height 1.1s cubic-bezier(.22,1,.36,1);
+  }
+  .water svg{
+    position:absolute; top:-19px; left:0; width:200%; height:20px;
+    animation:drift 6s linear infinite;
+  }
+  @keyframes drift{
+    from{ transform:translateX(0); }
+    to{ transform:translateX(-50%); }
+  }
+  .glass-readout{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    pointer-events:none;
+    z-index:2;
+  }
+  .amount{
+    font-family:'Fraunces', serif; font-weight:600; font-size:44px;
+    text-shadow:0 2px 18px rgba(0,0,0,0.35);
+    letter-spacing:-.02em;
+  }
+  .amount span{ font-size:20px; font-weight:500; opacity:.8; }
+  .goal-label{
+    font-size:12px; color:rgba(243,247,246,0.75); margin-top:2px;
+    text-shadow:0 1px 6px rgba(0,0,0,0.4);
+  }
+  .pct-ring{
+    position:absolute; top:10px; right:-6px;
+    background:var(--coral); color:var(--ink);
+    font-size:11px; font-weight:700; padding:4px 9px; border-radius:20px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.3);
+  }
+
+  /* --- Quick add --- */
+  .section-label{
+    font-size:12px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--slate-dim); font-weight:600; margin:26px 0 12px;
+  }
+  .pebbles{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:10px;
+  }
+  .pebble{
+    background:var(--ink-2);
+    border:1px solid rgba(255,255,255,0.08);
+    color:var(--foam);
+    border-radius:16px;
+    padding:14px 6px;
+    font-family:'Inter'; font-weight:600; font-size:14px;
+    cursor:pointer;
+    transition:transform .15s ease, background .15s ease, border-color .15s ease;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+  }
+  .pebble .ml{ font-size:11px; color:var(--slate); font-weight:500; }
+  .pebble:hover{ transform:translateY(-2px); border-color:var(--aqua); }
+  .pebble:active{ transform:translateY(0px) scale(.97); }
+
+  .custom-row{
+    display:flex; gap:10px; margin-top:10px;
+  }
+  .custom-row input{
+    flex:1; background:var(--ink-2); border:1px solid rgba(255,255,255,0.08);
+    color:var(--foam); border-radius:12px; padding:12px 14px; font-size:14px;
+    font-family:'Inter';
+  }
+  .custom-row input::placeholder{ color:var(--slate-dim); }
+  .custom-row input:focus{ outline:none; border-color:var(--tide); }
+  .custom-row button{
+    background:var(--tide); color:var(--foam); border:none; border-radius:12px;
+    padding:0 20px; font-weight:600; font-size:14px; cursor:pointer;
+    transition:background .15s ease;
+  }
+  .custom-row button:hover{ background:#3891C1; }
+
+  /* --- Log --- */
+  .log-list{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+  .log-empty{
+    color:var(--slate-dim); font-size:13px; padding:18px 0; text-align:center;
+    border:1px dashed rgba(255,255,255,0.1); border-radius:12px;
+  }
+  .log-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--ink-2); border-radius:12px; padding:10px 14px;
+    border:1px solid rgba(255,255,255,0.06);
+    animation:rise .3s ease;
+  }
+  @keyframes rise{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+  .log-left{ display:flex; align-items:center; gap:10px; }
+  .drop-dot{ width:8px; height:8px; border-radius:50%; background:var(--aqua); flex-shrink:0; }
+  .log-amt{ font-weight:600; font-size:14px; }
+  .log-time{ font-size:12px; color:var(--slate); }
+  .log-del{
+    background:none; border:none; color:var(--slate-dim); cursor:pointer;
+    font-size:16px; padding:4px 8px; border-radius:8px; transition:color .15s;
+  }
+  .log-del:hover{ color:var(--coral); }
+
+  /* --- Week tide --- */
+  .week{
+    display:flex; align-items:flex-end; justify-content:space-between;
+    height:90px; margin-top:10px; gap:8px;
+  }
+  .day-col{ flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; height:100%; justify-content:flex-end; }
+  .day-bar-track{ width:100%; height:64px; display:flex; align-items:flex-end; border-radius:6px; overflow:hidden; background:rgba(255,255,255,0.04); }
+  .day-bar{ width:100%; background:linear-gradient(180deg, var(--aqua), var(--tide)); border-radius:6px 6px 0 0; transition:height .6s ease; }
+  .day-bar.met{ background:linear-gradient(180deg, var(--coral), #C6603F); }
+  .day-name{ font-size:11px; color:var(--slate-dim); font-weight:600; }
+
+  /* --- Goal editor --- */
+  .goal-edit{
+    margin-top:26px; display:flex; align-items:center; justify-content:space-between;
+    background:var(--ink-2); border-radius:12px; padding:12px 14px;
+    border:1px solid rgba(255,255,255,0.06);
+  }
+  .goal-edit-label{ font-size:13px; color:var(--slate); }
+  .goal-edit input{
+    width:70px; background:transparent; border:none; color:var(--foam);
+    font-family:'Fraunces'; font-size:18px; text-align:right; font-weight:600;
+  }
+  .goal-edit input:focus{ outline:none; }
+
+  footer{ text-align:center; margin-top:34px; color:var(--slate-dim); font-size:11px; }
+
+  /* --- AI coach card --- */
+  .ai-card{
+    margin-top:26px;
+    background:linear-gradient(150deg, rgba(127,216,196,0.09), rgba(46,125,168,0.06));
+    border:1px solid rgba(127,216,196,0.22);
+    border-radius:14px;
+    padding:14px 16px;
+  }
+  .ai-card-top{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:8px;
+  }
+  .ai-badge{
+    display:flex; align-items:center; gap:6px;
+    font-size:12px; font-weight:700; letter-spacing:.04em;
+    color:var(--aqua); text-transform:uppercase;
+  }
+  .ai-refresh{
+    background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
+    color:var(--foam); width:26px; height:26px; border-radius:8px;
+    cursor:pointer; font-size:14px; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .15s ease, transform .3s ease;
+  }
+  .ai-refresh:hover{ background:rgba(255,255,255,0.12); }
+  .ai-refresh.spinning{ animation:spin .8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .ai-body{
+    font-size:13.5px; line-height:1.55; color:rgba(243,247,246,0.88);
+    min-height:20px;
+  }
+  .ai-body.loading{ color:var(--slate); font-style:italic; }
+  .ai-body.error{ color:var(--coral); }
+
+  /* --- Reminder settings --- */
+  .reminder-card{
+    margin-top:14px;
+    background:var(--ink-2);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:14px;
+    padding:14px 16px;
+  }
+  .reminder-top{
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .reminder-title{ font-size:13px; font-weight:700; color:var(--foam); }
+  .reminder-sub{ font-size:11.5px; color:var(--slate-dim); margin-top:2px; }
+  .switch{
+    position:relative; width:42px; height:24px; flex-shrink:0;
+  }
+  .switch input{ opacity:0; width:0; height:0; }
+  .switch-track{
+    position:absolute; inset:0; background:rgba(255,255,255,0.12);
+    border-radius:20px; cursor:pointer; transition:background .2s ease;
+  }
+  .switch-track::before{
+    content:""; position:absolute; width:18px; height:18px; left:3px; top:3px;
+    background:var(--foam); border-radius:50%; transition:transform .2s ease;
+  }
+  .switch input:checked + .switch-track{ background:var(--aqua); }
+  .switch input:checked + .switch-track::before{ transform:translateX(18px); }
+
+  .reminder-times{
+    display:flex; gap:10px; margin-top:12px;
+  }
+  .time-field{ flex:1; }
+  .time-field label{ font-size:10.5px; color:var(--slate-dim); text-transform:uppercase; letter-spacing:.06em; display:block; margin-bottom:4px; }
+  .time-field input{
+    width:100%; background:var(--ink); border:1px solid rgba(255,255,255,0.08);
+    color:var(--foam); border-radius:10px; padding:9px 10px; font-size:13px; font-family:'Inter';
+  }
+  .plan-btn{
+    width:100%; margin-top:12px;
+    background:linear-gradient(120deg, var(--tide), #3891C1);
+    color:var(--foam); border:none; border-radius:10px;
+    padding:11px; font-weight:600; font-size:13px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:7px;
+    transition:opacity .15s ease;
+  }
+  .plan-btn:hover{ opacity:.92; }
+  .plan-btn:disabled{ opacity:.55; cursor:default; }
+
+  .schedule-list{ margin-top:12px; display:flex; flex-direction:column; gap:6px; }
+  .schedule-row{
+    display:flex; align-items:center; gap:10px;
+    background:var(--ink); border:1px solid rgba(255,255,255,0.06);
+    border-radius:10px; padding:8px 10px;
+  }
+  .schedule-time{
+    font-family:'Fraunces'; font-weight:600; font-size:14px; color:var(--aqua);
+    min-width:56px;
+  }
+  .schedule-msg{ font-size:12px; color:rgba(243,247,246,0.85); line-height:1.4; }
+  .schedule-row.fired{ opacity:.45; }
+  .schedule-row.fired .schedule-time::after{ content:" ✓"; color:var(--aqua); }
+
+  /* --- Toast --- */
+  .toast-wrap{
+    position:fixed; top:16px; left:0; right:0;
+    display:flex; justify-content:center; z-index:50;
+    pointer-events:none;
+  }
+  .toast{
+    pointer-events:auto;
+    max-width:400px; width:calc(100% - 36px);
+    background:linear-gradient(150deg, #133247, #0E2536);
+    border:1px solid rgba(127,216,196,0.35);
+    box-shadow:0 12px 32px rgba(0,0,0,0.45);
+    border-radius:14px; padding:14px 16px;
+    display:flex; gap:12px; align-items:flex-start;
+    transform:translateY(-140%);
+    transition:transform .4s cubic-bezier(.22,1,.36,1);
+  }
+  .toast.show{ transform:translateY(0); }
+  .toast-icon{
+    width:30px; height:30px; border-radius:50%; flex-shrink:0;
+    background:rgba(127,216,196,0.15);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .toast-body{ flex:1; }
+  .toast-title{ font-size:12px; font-weight:700; color:var(--aqua); text-transform:uppercase; letter-spacing:.05em; margin-bottom:3px; }
+  .toast-text{ font-size:13.5px; line-height:1.45; color:var(--foam); }
+  .toast-actions{ display:flex; gap:8px; margin-top:9px; }
+  .toast-actions button{
+    border:none; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer;
+  }
+  .toast-log{ background:var(--aqua); color:var(--ink); }
+  .toast-dismiss{ background:rgba(255,255,255,0.08); color:var(--foam); }
+
+  /* --- Records panel --- */
+  .records-toggle{
+    display:flex; align-items:center; justify-content:space-between;
+    cursor:pointer; user-select:none;
+  }
+  .records-toggle .chev{ transition:transform .2s ease; color:var(--slate-dim); }
+  .records-toggle.open .chev{ transform:rotate(180deg); }
+  .records-panel{
+    max-height:0; overflow:hidden; transition:max-height .3s ease;
+  }
+  .records-panel.open{ max-height:600px; overflow-y:auto; }
+  .record-row{
+    display:flex; gap:10px; padding:10px 2px;
+    border-bottom:1px solid rgba(255,255,255,0.06);
+  }
+  .record-icon{
+    width:22px; height:22px; border-radius:6px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; margin-top:1px;
+  }
+  .record-icon.insight{ background:rgba(127,216,196,0.15); color:var(--aqua); }
+  .record-icon.reminder{ background:rgba(232,132,107,0.15); color:var(--coral); }
+  .record-text{ font-size:12.5px; line-height:1.45; color:rgba(243,247,246,0.85); }
+  .record-meta{ font-size:10.5px; color:var(--slate-dim); margin-top:2px; }
+  .records-empty{ color:var(--slate-dim); font-size:12.5px; padding:14px 2px; }
+  .records-clear{
+    margin-top:10px; background:none; border:none; color:var(--slate-dim);
+    font-size:11.5px; cursor:pointer; text-decoration:underline;
+  }
+  .records-clear:hover{ color:var(--coral); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="eyebrow">Tide</div>
+    <h1>Today's intake</h1>
+    <div class="date" id="dateLabel"></div>
+  </header>
+
+  <div class="apikey-card" id="apikeyCard">
+    <div class="apikey-top">
+      <div>
+        <div class="apikey-title">Anthropic API key</div>
+        <div class="apikey-sub">Needed for AI coach & reminders. Stored only in this browser.</div>
+      </div>
+    </div>
+    <div class="apikey-row">
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+      <button id="apiKeySave">Save</button>
+    </div>
+    <div class="apikey-status" id="apiKeyStatus"></div>
+  </div>
+
+  <div class="glass-wrap">
+    <div class="glass">
+      <div class="water" id="waterFill">
+        <svg viewBox="0 0 200 20" preserveAspectRatio="none">
+          <path d="M0 10 Q 12.5 0 25 10 T 50 10 T 75 10 T 100 10 T 125 10 T 150 10 T 175 10 T 200 10 V20 H0 Z" fill="#7FD8C4"/>
+        </svg>
+      </div>
+      <div class="glass-readout">
+        <div class="amount" id="amountLabel">0<span> ml</span></div>
+        <div class="goal-label" id="goalLabel">of 2000 ml</div>
+      </div>
+      <div class="pct-ring" id="pctRing">0%</div>
+    </div>
+  </div>
+
+  <div class="section-label">Quick add</div>
+  <div class="pebbles" id="pebbles">
+    <button class="pebble" data-ml="150">150<span class="ml">Glass</span></button>
+    <button class="pebble" data-ml="250">250<span class="ml">Cup</span></button>
+    <button class="pebble" data-ml="330">330<span class="ml">Can</span></button>
+    <button class="pebble" data-ml="500">500<span class="ml">Bottle</span></button>
+  </div>
+  <div class="custom-row">
+    <input type="number" id="customMl" placeholder="Custom amount, ml" min="1">
+    <button id="addCustom">Add</button>
+  </div>
+
+  <div class="ai-card" id="aiCard">
+    <div class="ai-card-top">
+      <div class="ai-badge">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.2 9.2L21 12L14.2 14.8L12 22L9.8 14.8L3 12L9.8 9.2L12 2Z" fill="#7FD8C4"/></svg>
+        Tide Coach
+      </div>
+      <button class="ai-refresh" id="aiRefresh" title="Get a new insight">↻</button>
+    </div>
+    <div class="ai-body" id="aiBody">Tap ↻ once you've logged a drink or two — I'll look at your pace today and give you a pointer.</div>
+  </div>
+
+  <div class="reminder-card">
+    <div class="reminder-top">
+      <div>
+        <div class="reminder-title">Smart reminders</div>
+        <div class="reminder-sub">AI plans when to nudge you, in plain messages</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="reminderToggle">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+
+    <div id="reminderSettings" style="display:none;">
+      <div class="reminder-times">
+        <div class="time-field">
+          <label>Wake</label>
+          <input type="time" id="wakeTime" value="07:00">
+        </div>
+        <div class="time-field">
+          <label>Sleep</label>
+          <input type="time" id="sleepTime" value="23:00">
+        </div>
+      </div>
+      <button class="plan-btn" id="planBtn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.2 9.2L21 12L14.2 14.8L12 22L9.8 14.8L3 12L9.8 9.2L12 2Z" fill="#F3F7F6"/></svg>
+        Plan today's reminders
+      </button>
+      <div class="schedule-list" id="scheduleList"></div>
+    </div>
+  </div>
+
+  <div class="section-label">Log</div>
+  <div class="log-list" id="logList"></div>
+
+  <div class="section-label">Last 7 days</div>
+  <div class="week" id="weekChart"></div>
+
+  <div class="goal-edit">
+    <span class="goal-edit-label">Daily goal (ml)</span>
+    <input type="number" id="goalInput" value="2000">
+  </div>
+
+  <div class="section-label" style="margin-top:26px;">
+    <div class="records-toggle" id="recordsToggle">
+      <span>AI record</span>
+      <span class="chev">⌄</span>
+    </div>
+  </div>
+  <div class="records-panel" id="recordsPanel">
+    <div id="recordsList"></div>
+    <button class="records-clear" id="recordsClear">Clear record</button>
+  </div>
+
+  <footer>Data stays on this device.</footer>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const todayKey = () => new Date().toISOString().slice(0,10);
+
+let state = {
+  goal: 2000,
+  logs: {}, // { "2026-07-01": [{ml, time}, ...] }
+  reminders: {
+    enabled: false,
+    wake: "07:00",
+    sleep: "23:00",
+    schedule: [] // [{time:"09:30", message:"...", fired:false, dateKey:"2026-07-01"}]
+  },
+  records: [] // [{type:'insight'|'reminder', text, time}]
+};
+
+function load(){
+  try{
+    const raw = localStorage.getItem('tide-water-state');
+    if(raw){
+      const parsed = JSON.parse(raw);
+      state = Object.assign(state, parsed);
+      state.reminders = Object.assign({enabled:false, wake:"07:00", sleep:"23:00", schedule:[]}, parsed.reminders||{});
+      state.records = parsed.records || [];
+    }
+  }catch(e){}
+}
+function save(){
+  try{ localStorage.setItem('tide-water-state', JSON.stringify(state)); }catch(e){}
+}
+
+function todayLogs(){
+  const k = todayKey();
+  if(!state.logs[k]) state.logs[k] = [];
+  return state.logs[k];
+}
+
+function totalFor(dateKey){
+  return (state.logs[dateKey]||[]).reduce((s,e)=>s+e.ml,0);
+}
+
+function addRecord(type, text){
+  state.records.unshift({ type, text, time: new Date().toISOString() });
+  if(state.records.length > 100) state.records.length = 100;
+  save();
+  renderRecords();
+}
+
+function renderRecords(){
+  const listEl = $('#recordsList');
+  if(!listEl) return;
+  if(state.records.length === 0){
+    listEl.innerHTML = `<div class="records-empty">No AI activity yet — insights and reminders will show up here.</div>`;
+    return;
+  }
+  listEl.innerHTML = state.records.map(r=>{
+    const t = new Date(r.time).toLocaleString(undefined, {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+    const icon = r.type === 'reminder' ? '💧' : '✦';
+    return `
+      <div class="record-row">
+        <div class="record-icon ${r.type}">${icon}</div>
+        <div>
+          <div class="record-text">${r.text}</div>
+          <div class="record-meta">${r.type === 'reminder' ? 'Reminder' : 'Insight'} · ${t}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function render(){
+  const total = totalFor(todayKey());
+  const goal = state.goal;
+  const pct = Math.min(100, Math.round((total/goal)*100));
+
+  $('#amountLabel').innerHTML = `${total}<span> ml</span>`;
+  $('#goalLabel').textContent = `of ${goal} ml`;
+  $('#pctRing').textContent = `${pct}%`;
+  $('#waterFill').style.height = pct + '%';
+  $('#goalInput').value = goal;
+
+  const dl = $('#dateLabel');
+  dl.textContent = new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+
+  // log list
+  const logs = todayLogs();
+  const listEl = $('#logList');
+  listEl.innerHTML = '';
+  if(logs.length === 0){
+    listEl.innerHTML = `<div class="log-empty">No entries yet — add your first glass above.</div>`;
+  } else {
+    [...logs].reverse().forEach((entry) => {
+      const idx = logs.indexOf(entry);
+      const row = document.createElement('div');
+      row.className = 'log-row';
+      const time = new Date(entry.time).toLocaleTimeString(undefined, {hour:'numeric', minute:'2-digit'});
+      row.innerHTML = `
+        <div class="log-left">
+          <div class="drop-dot"></div>
+          <div>
+            <div class="log-amt">${entry.ml} ml</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="log-time">${time}</div>
+          <button class="log-del" data-idx="${idx}">✕</button>
+        </div>
+      `;
+      listEl.appendChild(row);
+    });
+  }
+
+  // week chart
+  const weekEl = $('#weekChart');
+  weekEl.innerHTML = '';
+  const dayNames = ['S','M','T','W','T','F','S'];
+  for(let i=6;i>=0;i--){
+    const d = new Date();
+    d.setDate(d.getDate()-i);
+    const key = d.toISOString().slice(0,10);
+    const t = totalFor(key);
+    const pctBar = Math.min(100, Math.round((t/goal)*100));
+    const met = t >= goal && t > 0;
+    const col = document.createElement('div');
+    col.className = 'day-col';
+    col.innerHTML = `
+      <div class="day-bar-track">
+        <div class="day-bar ${met?'met':''}" style="height:${pctBar}%"></div>
+      </div>
+      <div class="day-name">${dayNames[d.getDay()]}</div>
+    `;
+    weekEl.appendChild(col);
+  }
+
+  save();
+}
+
+function addWater(ml){
+  if(!ml || ml <= 0) return;
+  todayLogs().push({ ml: Math.round(ml), time: new Date().toISOString() });
+  render();
+  scheduleAutoInsight();
+}
+
+$('#pebbles').addEventListener('click', e=>{
+  const btn = e.target.closest('.pebble');
+  if(!btn) return;
+  addWater(Number(btn.dataset.ml));
+});
+
+$('#addCustom').addEventListener('click', ()=>{
+  const val = Number($('#customMl').value);
+  if(val > 0){ addWater(val); $('#customMl').value=''; }
+});
+$('#customMl').addEventListener('keydown', e=>{
+  if(e.key === 'Enter'){ $('#addCustom').click(); }
+});
+
+$('#logList').addEventListener('click', e=>{
+  const btn = e.target.closest('.log-del');
+  if(!btn) return;
+  const idx = Number(btn.dataset.idx);
+  todayLogs().splice(idx,1);
+  render();
+});
+
+$('#goalInput').addEventListener('change', e=>{
+  const v = Number(e.target.value);
+  if(v > 0){ state.goal = v; render(); }
+});
+
+// --- AI Coach ---
+const aiBody = $('#aiBody');
+const aiRefresh = $('#aiRefresh');
+let aiTimer = null;
+
+function buildSummary(){
+  const total = totalFor(todayKey());
+  const goal = state.goal;
+  const logs = todayLogs();
+  const now = new Date();
+  const hour = now.getHours() + now.getMinutes()/60;
+
+  const gapsMin = [];
+  for(let i=1;i<logs.length;i++){
+    gapsMin.push(Math.round((new Date(logs[i].time) - new Date(logs[i-1].time))/60000));
+  }
+  const lastEntry = logs[logs.length-1];
+  const minsSinceLast = lastEntry ? Math.round((now - new Date(lastEntry.time))/60000) : null;
+
+  return {
+    goal_ml: goal,
+    total_ml: total,
+    pct_of_goal: Math.round((total/goal)*100),
+    current_hour_of_day: Math.round(hour*10)/10,
+    num_entries_today: logs.length,
+    entry_sizes_ml: logs.map(l=>l.ml),
+    minutes_since_last_drink: minsSinceLast,
+    gaps_between_drinks_minutes: gapsMin
+  };
+}
+
+async function fetchInsight(){
+  aiRefresh.classList.add('spinning');
+  aiBody.classList.remove('error');
+  aiBody.classList.add('loading');
+  aiBody.textContent = 'Reading today\'s pace…';
+
+  const summary = buildSummary();
+  const prompt = `You are "Tide Coach", a terse, warm hydration coach embedded in a water tracking app. Given this JSON of the user's drinking pattern today, write ONE short insight or nudge (max 2 sentences, no greeting, no markdown, plain text only). Be specific and reference actual numbers from the data when useful (e.g. pace, time since last drink, percent of goal). If data is sparse (0-1 entries), just give a light, encouraging nudge to log or drink. Vary your angle each time — sometimes pace, sometimes timing, sometimes gentle encouragement, sometimes a practical tip. Never be preachy or clinical.
+
+Data: ${JSON.stringify(summary)}`;
+
+  try{
+    const text = await callClaude(prompt, 150);
+    aiBody.classList.remove('loading');
+    aiBody.textContent = text || "Couldn't come up with a thought this time — try again.";
+    if(text) addRecord('insight', text);
+  }catch(err){
+    aiBody.classList.remove('loading');
+    aiBody.classList.add('error');
+    if(err.message === 'NO_KEY'){
+      aiBody.textContent = "Add your Anthropic API key up top to turn on the coach.";
+    } else if(err.message === 'BAD_KEY'){
+      aiBody.textContent = "That API key was rejected — check it and save again.";
+    } else {
+      aiBody.textContent = "Couldn't reach the coach just now (" + err.message + ").";
+    }
+  }finally{
+    aiRefresh.classList.remove('spinning');
+  }
+}
+
+aiRefresh.addEventListener('click', fetchInsight);
+
+// auto-refresh insight shortly after a new log, debounced
+function scheduleAutoInsight(){
+  clearTimeout(aiTimer);
+  aiTimer = setTimeout(fetchInsight, 900);
+}
+
+// --- Smart Reminders ---
+const reminderToggle = $('#reminderToggle');
+const reminderSettings = $('#reminderSettings');
+const wakeInput = $('#wakeTime');
+const sleepInput = $('#sleepTime');
+const planBtn = $('#planBtn');
+const scheduleList = $('#scheduleList');
+
+function initReminderUI(){
+  reminderToggle.checked = state.reminders.enabled;
+  reminderSettings.style.display = state.reminders.enabled ? 'block' : 'none';
+  wakeInput.value = state.reminders.wake;
+  sleepInput.value = state.reminders.sleep;
+  renderSchedule();
+}
+
+function renderSchedule(){
+  const todaysSchedule = (state.reminders.schedule||[]).filter(s=>s.dateKey === todayKey());
+  if(todaysSchedule.length === 0){
+    scheduleList.innerHTML = '';
+    return;
+  }
+  scheduleList.innerHTML = todaysSchedule.map(s=>`
+    <div class="schedule-row ${s.fired ? 'fired':''}">
+      <div class="schedule-time">${s.time}</div>
+      <div class="schedule-msg">${s.message}</div>
+    </div>
+  `).join('');
+}
+
+reminderToggle.addEventListener('change', ()=>{
+  state.reminders.enabled = reminderToggle.checked;
+  reminderSettings.style.display = state.reminders.enabled ? 'block' : 'none';
+  save();
+});
+
+wakeInput.addEventListener('change', ()=>{ state.reminders.wake = wakeInput.value; save(); });
+sleepInput.addEventListener('change', ()=>{ state.reminders.sleep = sleepInput.value; save(); });
+
+async function planReminders(){
+  planBtn.disabled = true;
+  const originalHTML = planBtn.innerHTML;
+  planBtn.innerHTML = 'Planning…';
+
+  const total = totalFor(todayKey());
+  const goal = state.goal;
+  const logs = todayLogs();
+
+  const payload = {
+    goal_ml: goal,
+    total_ml_so_far: total,
+    wake_time: wakeInput.value,
+    sleep_time: sleepInput.value,
+    current_time: new Date().toTimeString().slice(0,5),
+    entries_logged_today: logs.map(l=>({ ml: l.ml, time: new Date(l.time).toTimeString().slice(0,5) }))
+  };
+
+  const prompt = `You are scheduling water-drinking reminders for a hydration app for the REST of today only. The user wakes at ${payload.wake_time} and sleeps at ${payload.sleep_time}. It is currently ${payload.current_time}. Their goal is ${payload.goal_ml}ml/day and they've had ${payload.total_ml_so_far}ml so far from these entries: ${JSON.stringify(payload.entries_logged_today)}.
+
+Spread reminders evenly between now and sleep time (skip times already past), spaced roughly 90-150 minutes apart, fewer if little time remains. Each reminder needs a short, warm, natural-sounding message (like a text from a friend, not a robot) — max 18 words, no emoji, no "Hi!", vary the phrasing between reminders. Reference time of day naturally sometimes (e.g. mention afternoon slump, evening wind-down) but don't force it into every one.
+
+Respond with ONLY valid JSON, no markdown fences, no preamble, in this exact shape:
+{"reminders":[{"time":"HH:MM","message":"..."}]}`;
+
+  try{
+    const text = await callClaude(prompt, 800);
+    const cleaned = text.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(cleaned);
+
+    const dateKey = todayKey();
+    // remove old unfired reminders for today, keep fired history
+    state.reminders.schedule = (state.reminders.schedule||[]).filter(s => s.dateKey !== dateKey || s.fired);
+    (parsed.reminders||[]).forEach(r=>{
+      if(r.time && r.message){
+        state.reminders.schedule.push({ time:r.time, message:r.message, fired:false, dateKey });
+      }
+    });
+    state.reminders.schedule.sort((a,b)=> a.time.localeCompare(b.time));
+    save();
+    renderSchedule();
+    addRecord('insight', `Planned ${parsed.reminders.length} reminder(s) for today.`);
+  }catch(err){
+    let msg = "Couldn't plan reminders right now. Try again shortly.";
+    if(err.message === 'NO_KEY') msg = "Add your Anthropic API key up top first.";
+    else if(err.message === 'BAD_KEY') msg = "That API key was rejected — check it and save again.";
+    scheduleList.innerHTML = `<div class="records-empty" style="color:var(--coral)">${msg}</div>`;
+  }finally{
+    planBtn.disabled = false;
+    planBtn.innerHTML = originalHTML;
+  }
+}
+
+planBtn.addEventListener('click', planReminders);
+
+// --- Toast display ---
+function showToast(message){
+  const wrap = $('#toastWrap');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `
+    <div class="toast-icon">💧</div>
+    <div class="toast-body">
+      <div class="toast-title">Time to hydrate</div>
+      <div class="toast-text">${message}</div>
+      <div class="toast-actions">
+        <button class="toast-log">Log a glass</button>
+        <button class="toast-dismiss">Dismiss</button>
+      </div>
+    </div>
+  `;
+  wrap.appendChild(toast);
+  requestAnimationFrame(()=> toast.classList.add('show'));
+
+  function remove(){
+    toast.classList.remove('show');
+    setTimeout(()=> toast.remove(), 400);
+  }
+  toast.querySelector('.toast-dismiss').addEventListener('click', remove);
+  toast.querySelector('.toast-log').addEventListener('click', ()=>{
+    addWater(250);
+    remove();
+  });
+  setTimeout(remove, 15000);
+}
+
+// --- Minute tick: check for due reminders ---
+function checkReminders(){
+  if(!state.reminders.enabled) return;
+  const dateKey = todayKey();
+  const nowStr = new Date().toTimeString().slice(0,5);
+  let changed = false;
+  (state.reminders.schedule||[]).forEach(s=>{
+    if(s.dateKey === dateKey && !s.fired && s.time <= nowStr){
+      s.fired = true;
+      changed = true;
+      showToast(s.message);
+      addRecord('reminder', s.message);
+    }
+  });
+  if(changed){ save(); renderSchedule(); }
+}
+setInterval(checkReminders, 30000);
+checkReminders();
+
+// --- Records panel toggle ---
+const recordsToggle = $('#recordsToggle');
+const recordsPanel = $('#recordsPanel');
+recordsToggle.addEventListener('click', ()=>{
+  recordsToggle.classList.toggle('open');
+  recordsPanel.classList.toggle('open');
+});
+$('#recordsClear').addEventListener('click', ()=>{
+  state.records = [];
+  save();
+  renderRecords();
+});
+
+initReminderUI();
+renderRecords();
+
+
+load();
+
+// --- API key management ---
+const apiKeyInput = $('#apiKeyInput');
+const apiKeySave = $('#apiKeySave');
+const apiKeyStatus = $('#apiKeyStatus');
+
+function getApiKey(){
+  return localStorage.getItem('tide-anthropic-key') || '';
+}
+function setApiKey(key){
+  localStorage.setItem('tide-anthropic-key', key);
+}
+function refreshApiKeyStatus(){
+  const key = getApiKey();
+  if(key){
+    apiKeyInput.value = key;
+    apiKeyStatus.textContent = 'Key saved — AI features are active.';
+    apiKeyStatus.className = 'apikey-status ok';
+  } else {
+    apiKeyStatus.textContent = 'No key saved yet — AI coach and reminders won\'t work until you add one.';
+    apiKeyStatus.className = 'apikey-status warn';
+  }
+}
+apiKeySave.addEventListener('click', ()=>{
+  const val = apiKeyInput.value.trim();
+  setApiKey(val);
+  refreshApiKeyStatus();
+});
+refreshApiKeyStatus();
+
+// Shared call to Anthropic's API directly from the browser using the user's own key.
+async function callClaude(promptText, maxTokens){
+  const key = getApiKey();
+  if(!key){
+    throw new Error('NO_KEY');
+  }
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: maxTokens || 300,
+      messages: [{ role: "user", content: promptText }]
+    })
+  });
+
+  if(!response.ok){
+    let detail = '';
+    try{ const errBody = await response.json(); detail = errBody?.error?.message || ''; }catch(e){}
+    if(response.status === 401) throw new Error('BAD_KEY');
+    throw new Error('HTTP_' + response.status + (detail ? ': ' + detail : ''));
+  }
+  const data = await response.json();
+  return data.content.map(b => b.type === 'text' ? b.text : '').filter(Boolean).join(' ').trim();
+}
+
+render();
+</script>
+</body>
+</html>

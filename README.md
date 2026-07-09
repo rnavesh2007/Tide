@@ -2,6 +2,8 @@
 
 A single-file web app that tracks daily water intake with an AI hydration coach and smart reminders.
 
+**Live app:** https://rnavesh2007.github.io/Tide/
+
 ## Features
 
 - **Tide glass visual** — animated water level shows progress toward your daily goal
@@ -16,14 +18,19 @@ A single-file web app that tracks daily water intake with an AI hydration coach 
 
 ## Setup
 
+**Option 1 — Use it online:**
+Just open https://rnavesh2007.github.io/Tide/ in your browser.
+
+**Option 2 — Run it locally:**
 1. Download `water-tracker.html`
 2. Open it in any modern browser (Chrome, Safari, Firefox, Edge)
-3. To enable the AI Coach and Smart Reminders:
+
+To enable the AI Coach and Smart Reminders (either option):
    - Get an API key from [console.anthropic.com](https://console.anthropic.com) → **API Keys**
    - Paste it into the **Anthropic API key** field near the top of the app
    - Click **Save**
 
-That's it — no install, no build step, no server.
+No install, no build step, no server required.
 
 ## Using it
 
